@@ -16152,7 +16152,7 @@
                 return i < h ? (s && (tt.instance().showTip("馒头不足"), N.instance().playSound("popup_notification")), {
                     success: !1,
                     reason: "馒头不足"
-                }) : (s ? (this.ng.Gn.gold += h, this.ng.Gn.yi += 2) : (this.ng.Gn.Ki += h, this.ng.Gn.fi += 2), this.AF(s), s || (this.EF(), this.lF()), {
+                }) : (s ? (this.ng.Gn.gold += h, this.ng.Gn.yi += 2) : (this.ng.Gn.Ki -= h, this.ng.Gn.fi += 2), this.AF(s), s || (this.EF(), this.lF()), {
                     success: !0
                 })
             }
