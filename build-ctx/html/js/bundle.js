@@ -1107,7 +1107,7 @@
                         void 0 !== t[s][i] && (this._data[s][i] = t[s][i])
                     }) : Array.isArray(t[s]) && (this._data[s] = t[s]) : void 0 !== t[s] && (this._data[s] = t[s])
                 }
-                this.resetData(), this.setData()
+                this._data._props = [], this.resetData(), this.setData()
             }
             getType(t) {
                 var s = Object.prototype.toString.call(t).match(/^\[object (.*)\]$/)[1].toLowerCase();
