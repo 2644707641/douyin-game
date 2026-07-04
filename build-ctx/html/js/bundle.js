@@ -8425,7 +8425,7 @@
                 y.instance.on(u.Lt, this, this.Ex), y.instance.on(u.wt, this, this.Bx), y.instance.on(u.vt, this, this.Ix), y.instance.on(u.kt, this, this.Dx), y.instance.on(u._t, this, this.Tx)
             }
             Px() {
-                F.instance().rank.ca.id >= this.Ue.Re && (F.instance().player.openProps = !0)
+                F.instance().player.openProps = !0
             }
             getPropsType(t) {
                 return Array.isArray(t) ? t[0] : t
