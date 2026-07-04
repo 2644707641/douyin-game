@@ -5,21 +5,21 @@
   "trailingSlash": false,
   "headers": [
     {
-      "source": "/(.*)\\.(lh|ls|atlas)$",
+      "source": "/:path*.(lh|ls|atlas)",
       "headers": [
         { "key": "Content-Type", "value": "application/json" },
         { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
       ]
     },
     {
-      "source": "/(.*)\\.(sk|shader)$",
+      "source": "/:path*.(sk|shader)",
       "headers": [
         { "key": "Content-Type", "value": "application/octet-stream" },
         { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
       ]
     },
     {
-      "source": "/(.*\\.(js|json|png|jpe?g|webp|mp3|wav|ico))$",
+      "source": "/:path*.(js|json|png|jpg|jpeg|webp|mp3|wav|ico|css|svg|wasm|ttf|woff|woff2)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
       ]
@@ -27,11 +27,11 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)\\.shader$",
-      "destination": "/$1.shader.txt"
+      "source": "/:path*.shader",
+      "destination": "/:path.shader.txt"
     },
     {
-      "source": "/((?!.*\\.(js|json|png|jpg|jpeg|webp|mp3|wav|lh|ls|atlas|sk|shader|txt|css|svg|ico|map|wasm|ttf|woff2?)).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
