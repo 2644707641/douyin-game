@@ -21129,10 +21129,7 @@
                 }
                 this.flyStars.visible = !1;
                 for (let t = 0; t < this.gq.length; t++) this.gq[t] && this.gq[t].parent && this.gq[t].removeSelf();
-                if (this.gq = [], Laya.Tween.killAll(this.goldBg), this.goldBg.scale(0, 0), console.log("关闭结算场景"), K.instance().Iu("GameOverScene"), K.instance().Eu("MainScene"), F.instance().player.openProps) {
-                    let t = Ni.instance().Hx();
-                    t.length > 0 && K.instance().Eu("ShopScene", !1, t)
-                }
+                if (this.gq = [], Laya.Tween.killAll(this.goldBg), this.goldBg.scale(0, 0), console.log("关闭结算场景"), K.instance().Iu("GameOverScene"), K.instance().Eu("MainScene"));
                 F.instance().Gn.Wi.length = 0, this.vq.length = 0, Laya.Tween.killAll(this.arrow)
             }
         };
