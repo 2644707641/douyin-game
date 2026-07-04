@@ -21425,7 +21425,7 @@
             onOpened(t) {
                 wt.instance().xy(), this.AV(), this.weaponBtn.visible = !0;
                 const s = F.instance().player;
-                Ji.instance().Xb() && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), this.FV(), this.OV()
+                s.openProps && (this.shopBtn.visible = !0, this.shopWalk.visible = !1), Ji.instance().Xb() && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), this.FV(), this.OV()
             }
             onClosed() {
                 this.mV > 0 && ($.instance().El("btnSparkle", this.mV), this.mV = 0), this.YV(), this.XV(), Laya.Tween.killAll(this.dySidebarBtnLight)
