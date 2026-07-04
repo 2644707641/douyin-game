@@ -1,0 +1,86 @@
+Shader3D Start
+{
+    type:Shader3D,
+    name:basicShader,
+    enableInstancing:true,
+    supportReflectionProbe:true,
+    shaderType:D2_TextureSV,
+    uniformMap:{
+        u_Color: { type: Color, default: [1.0, 1.0, 1.0, 1.0] },
+        u_Time: { type: Float, default: 0.0 },
+        u_Intensity: { type: Float, default: 1.0 }
+    },
+    attributeMap: {
+        a_posuv: Vector4,
+        a_attribColor: Vector4,
+        a_attribFlags: Vector4,
+        a_customs: Vector4,
+    },
+    defines: {
+        TEXTUREVS: { type: bool, default: true }
+    }
+    shaderPass:[
+        {
+            pipeline:Forward,
+            VS:basicVS,
+            FS:basicPS
+        }
+    ]
+}
+Shader3D End
+
+GLSL Start
+#defineGLSL basicVS
+
+    #define SHADER_NAME basicShader
+    #include "Sprite2DVertex.glsl";
+
+    void main() {
+        vertexInfo info;
+        getVertexInfo(info);
+
+        v_cliped = info.cliped;
+        v_texcoordAlpha = info.texcoordAlpha;
+        v_useTex = info.useTex;
+        v_color = info.color;
+        v_useClip = info.useClip;
+        v_customs = info.customs;
+
+        gl_Position = getPosition(info.pos);
+    }
+
+#endGLSL
+
+#defineGLSL basicPS
+    #define SHADER_NAME basicShader
+    #if defined(GL_FRAGMENT_PRECISION_HIGH)
+        precision highp float;
+    #else
+        precision mediump float;
+    #endif
+
+    #include "Sprite2DFrag.glsl";
+
+    void main()
+    {
+        clip();
+        
+        // 获取原始纹理颜色
+        vec4 color = getSpriteTextureColor();
+        
+        // 获取UV坐标
+        vec2 uv = v_texcoordAlpha.xy;
+        
+        // 应用uniform颜色（可以用于颜色叠加或调整）
+        color.rgb *= u_Color.rgb;
+        color.a *= u_Color.a;
+        
+        // 应用强度参数
+        color.rgb *= u_Intensity;
+        
+        // 输出最终颜色
+        setglColor(color);
+    }
+    
+#endGLSL
+GLSL End

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "build-ctx/html",
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*)\\.(lh|ls|atlas)$",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(sk|shader)$",
+      "headers": [
+        { "key": "Content-Type", "value": "application/octet-stream" },
+        { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*\\.(js|json|png|jpe?g|webp|mp3|wav|ico))$",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)\\.shader$",
+      "destination": "/$1.shader.txt"
+    },
+    {
+      "source": "/((?!.*\\.(js|json|png|jpg|jpeg|webp|mp3|wav|lh|ls|atlas|sk|shader|txt|css|svg|ico|map|wasm|ttf|woff2?)).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

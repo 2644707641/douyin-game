@@ -1,0 +1,139 @@
+Shader3D Start
+{
+    type:Shader3D,
+    name:buttonShapeGlow,
+    enableInstancing:true,
+    supportReflectionProbe:true,
+    shaderType:D2_TextureSV,
+    uniformMap:{
+        u_GlowColor: { type: Color, default: [1.0, 0.8, 0.2, 1.0] },
+        u_Time: { type: Float, default: 0.0 }
+    },
+    attributeMap: {
+        a_posuv: Vector4,
+        a_attribColor: Vector4,
+        a_attribFlags: Vector4,
+        a_customs: Vector4,
+    },
+    defines: {
+        TEXTUREVS: { type: bool, default: true }
+    }
+    shaderPass:[
+        {
+            pipeline:Forward,
+            VS:textureVS,
+            FS:texturePS
+        }
+    ]
+}
+Shader3D End
+
+GLSL Start
+#defineGLSL textureVS
+
+    #define SHADER_NAME buttonShapeGlow
+    #include "Sprite2DVertex.glsl";
+
+    void main() {
+	    vertexInfo info;
+	    getVertexInfo(info);
+
+	    v_cliped = info.cliped;
+	    v_texcoordAlpha = info.texcoordAlpha;
+	    v_useTex = info.useTex;
+	    v_color = info.color;
+        v_useClip = info.useClip;
+        v_customs = info.customs;
+
+	    gl_Position = getPosition(info.pos);
+    }
+
+#endGLSL
+
+#defineGLSL texturePS
+    #define SHADER_NAME buttonShapeGlow
+    #if defined(GL_FRAGMENT_PRECISION_HIGH)
+        precision highp float;
+    #else
+        precision mediump float;
+    #endif
+
+    #include "Sprite2DFrag.glsl";
+
+    void main()
+    {
+        clip();
+        vec4 color = getSpriteTextureColor();
+        vec2 uv = v_texcoordAlpha.xy;
+        
+        // 如果原始像素透明度很低，说明在透明区域，直接跳过
+        if (color.a < 0.1) {
+            setglColor(color);
+            return;
+        }
+        
+        // 简化的边缘检测：基于UV坐标距离边缘的距离
+        float borderWidth = 0.08;
+        float distToEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+        
+        // 只在边框区域添加流光效果
+        if (distToEdge < borderWidth) {
+            // 计算当前像素在边框上的位置（顺时针：上->右->下->左）
+            float pos = 0.0;
+            
+            // 判断在哪个边上（使用更精确的浮点数比较）
+            float distLeft = uv.x;
+            float distRight = 1.0 - uv.x;
+            float distTop = uv.y;
+            float distBottom = 1.0 - uv.y;
+            
+            // 使用更稳定的判断方式
+            if (abs(distToEdge - distTop) < 0.001 && uv.y <= 0.5) {
+                // 上边（从左到右）
+                pos = uv.x * 0.25;
+            } else if (abs(distToEdge - distRight) < 0.001 && uv.x >= 0.5) {
+                // 右边（从上到下）
+                pos = 0.25 + uv.y * 0.25;
+            } else if (abs(distToEdge - distBottom) < 0.001 && uv.y >= 0.5) {
+                // 下边（从右到左）
+                pos = 0.5 + (1.0 - uv.x) * 0.25;
+            } else {
+                // 左边（从下到上）
+                pos = 0.75 + (1.0 - uv.y) * 0.25;
+            }
+            
+            // 第一条流光线
+            float glowPos1 = fract(pos + u_Time * 0.4);
+            float glowWidth = 0.25; // 流光宽度
+            float glowDist1 = abs(glowPos1 - 0.5) * 2.0;
+            float glowStrength1 = 1.0 - smoothstep(0.0, glowWidth, glowDist1);
+            
+            // 第二条流光线（始终保持180度对称）
+            float glowPos2 = fract(pos + u_Time * 0.4 + 0.5); // 相同速度，固定相位差180度
+            float glowDist2 = abs(glowPos2 - 0.5) * 2.0;
+            float glowStrength2 = 1.0 - smoothstep(0.0, glowWidth, glowDist2);
+            
+            // 合并两条流光线的强度
+            float totalGlowStrength = max(glowStrength1, glowStrength2);
+            
+            // 边框渐变效果
+            float edgeFade = 1.0 - smoothstep(0.0, borderWidth, distToEdge);
+            totalGlowStrength *= edgeFade;
+            
+            // 应用流光效果
+            if (totalGlowStrength > 0.1) {
+                // 使用按钮图片颜色作为流光颜色（保持原有效果）
+                vec3 glow1 = color.rgb * glowStrength1 * 1.4;
+                vec3 glow2 = color.rgb * glowStrength2 * 1.4;
+                
+                vec3 finalGlow = glow1 + glow2;
+                color.rgb = color.rgb + finalGlow;
+                color.a = max(color.a, totalGlowStrength * 0.8);
+            }
+        }
+        
+        setglColor(color);
+    }
+    
+#endGLSL
+GLSL End

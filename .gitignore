@@ -1,0 +1,25 @@
+# nginx base image leftovers (read-only image artifacts, NOT source)
+bin/
+sbin/
+lib/
+usr/
+etc/
+var/
+proc/
+sys/
+dev/
+tmp/
+root/
+run/
+.dockerenv
+docker-entrypoint.sh
+
+# spec workflow state
+.spec-workflow/
+
+# os / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
