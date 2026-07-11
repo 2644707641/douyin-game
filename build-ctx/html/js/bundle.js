@@ -16152,7 +16152,7 @@
                 return i < h ? (s && (tt.instance().showTip("馒头不足"), N.instance().playSound("popup_notification")), {
                     success: !1,
                     reason: "馒头不足"
-                }) : (s ? (this.ng.Gn.gold += h, this.ng.Gn.yi += 2) : (this.ng.Gn.Ki -= h, this.ng.Gn.fi += 2), this.AF(s), s || (this.EF(), this.lF()), {
+                }) : (s ? (this.ng.Gn.gold -= h, this.ng.Gn.yi += 2) : (this.ng.Gn.Ki -= h, this.ng.Gn.fi += 2), this.AF(s), s || (this.EF(), this.lF()), {
                     success: !0
                 })
             }
@@ -21420,9 +21420,10 @@
                 }), this.dySidebarBtn.on(Laya.Event.CLICK, this, this.EV), $.instance().cl([this.playBtn, this.settingBtn, this.avatarArea, this.rankBtn, this.weaponBtn, this.addStaminaBtn, this.dySidebarBtn, this.shopWalk]), y.instance.on(u.$t, this, this.uN), y.instance.on(u.Vt, this, this.VH), y.instance.on(u.Qt, this, this.BV), y.instance.on(u.Zt, this, this.IV), this.DV(), Bn.instance().AH && this.TV()
             }
             onOpened(t) {
-                wt.instance().xy(), this.AV(), this.weaponBtn.visible = !0;
-                const s = F.instance().player;
-                s.openProps && (this.shopBtn.visible = !0, this.shopWalk.visible = !1), Ji.instance().Xb() && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), this.FV(), this.OV()
+                wt.instance().xy(), this.AV();
+                const s = F.instance().player,
+                    i = Ji.instance().Xb();
+                this.weaponBtn.visible = i, s.openProps && (this.shopBtn.visible = !0, this.shopWalk.visible = !1), i && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), i ? this.FV() : this.XV(), this.OV()
             }
             onClosed() {
                 this.mV > 0 && ($.instance().El("btnSparkle", this.mV), this.mV = 0), this.YV(), this.XV(), Laya.Tween.killAll(this.dySidebarBtnLight)
@@ -21477,8 +21478,7 @@
             }
             MV() {
                 const t = Ji.instance();
-                K.instance().Eu("WeaponScene")
-                // t.Xb() ? K.instance().Eu("WeaponScene") : tt.instance().showTip("第" + t.Hb() + "天解锁武器呦~")
+                t.Xb() ? K.instance().Eu("WeaponScene") : tt.instance().showTip("第" + t.Hb() + "天解锁武器呦~")
             }
             bV() {
                 K.instance().Ru("GetStaminaDialog")
