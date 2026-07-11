@@ -1,0 +1,118 @@
+
+skeleton.png
+size: 512,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+bao
+  rotate: true
+  xy: 175, 60
+  size: 40, 60
+  orig: 40, 60
+  offset: 0, 0
+  index: -1
+guang
+  rotate: false
+  xy: 1, 236
+  size: 266, 259
+  orig: 266, 259
+  offset: 0, 0
+  index: -1
+jiao
+  rotate: true
+  xy: 330, 256
+  size: 49, 63
+  orig: 49, 63
+  offset: 0, 0
+  index: -1
+jiao1
+  rotate: true
+  xy: 155, 21
+  size: 37, 64
+  orig: 37, 64
+  offset: 0, 0
+  index: -1
+jiao4
+  rotate: false
+  xy: 175, 156
+  size: 85, 78
+  orig: 85, 78
+  offset: 0, 0
+  index: -1
+liang
+  rotate: false
+  xy: 428, 319
+  size: 46, 57
+  orig: 46, 57
+  offset: 0, 0
+  index: -1
+liang1
+  rotate: true
+  xy: 1, 1
+  size: 59, 89
+  orig: 59, 89
+  offset: 0, 0
+  index: -1
+liang2
+  rotate: false
+  xy: 269, 253
+  size: 59, 89
+  orig: 59, 89
+  offset: 0, 0
+  index: -1
+liang3
+  rotate: false
+  xy: 1, 62
+  size: 172, 172
+  orig: 172, 172
+  offset: 0, 0
+  index: -1
+liang4
+  rotate: false
+  xy: 269, 344
+  size: 157, 151
+  orig: 157, 151
+  offset: 0, 0
+  index: -1
+qi
+  rotate: false
+  xy: 428, 432
+  size: 73, 63
+  orig: 73, 63
+  offset: 0, 0
+  index: -1
+shi
+  rotate: false
+  xy: 395, 281
+  size: 24, 24
+  orig: 24, 24
+  offset: 0, 0
+  index: -1
+zhang
+  rotate: false
+  xy: 175, 102
+  size: 61, 52
+  orig: 61, 52
+  offset: 0, 0
+  index: -1
+zhang1
+  rotate: false
+  xy: 92, 8
+  size: 61, 52
+  orig: 61, 52
+  offset: 0, 0
+  index: -1
+zhang2
+  rotate: false
+  xy: 428, 378
+  size: 61, 52
+  orig: 61, 52
+  offset: 0, 0
+  index: -1
+zhuan
+  rotate: false
+  xy: 330, 307
+  size: 96, 35
+  orig: 96, 35
+  offset: 0, 0
+  index: -1

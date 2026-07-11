@@ -1,0 +1,167 @@
+
+skeleton.png
+size: 760,272
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+cao1
+  rotate: false
+  xy: 343, 64
+  size: 100, 100
+  orig: 100, 100
+  offset: 0, 0
+  index: -1
+cao2
+  rotate: false
+  xy: 409, 171
+  size: 100, 100
+  orig: 100, 100
+  offset: 0, 0
+  index: -1
+cao3
+  rotate: false
+  xy: 445, 69
+  size: 100, 100
+  orig: 100, 100
+  offset: 0, 0
+  index: -1
+cao4
+  rotate: false
+  xy: 511, 171
+  size: 100, 100
+  orig: 100, 100
+  offset: 0, 0
+  index: -1
+cao5
+  rotate: false
+  xy: 656, 11
+  size: 72, 84
+  orig: 72, 84
+  offset: 0, 0
+  index: -1
+hu1
+  rotate: true
+  xy: 481, 3
+  size: 64, 82
+  orig: 64, 82
+  offset: 0, 0
+  index: -1
+hu2
+  rotate: false
+  xy: 700, 187
+  size: 59, 84
+  orig: 59, 84
+  offset: 0, 0
+  index: -1
+hu3
+  rotate: false
+  xy: 649, 97
+  size: 81, 86
+  orig: 81, 86
+  offset: 0, 0
+  index: -1
+huo1
+  rotate: false
+  xy: 211, 153
+  size: 95, 118
+  orig: 95, 118
+  offset: 0, 0
+  index: -1
+huo2
+  rotate: false
+  xy: 149, 7
+  size: 95, 118
+  orig: 95, 118
+  offset: 0, 0
+  index: -1
+huo3
+  rotate: false
+  xy: 246, 33
+  size: 95, 118
+  orig: 95, 118
+  offset: 0, 0
+  index: -1
+huo4
+  rotate: false
+  xy: 1, 115
+  size: 130, 156
+  orig: 130, 156
+  offset: 0, 0
+  index: -1
+shui1
+  rotate: false
+  xy: 390, 3
+  size: 89, 59
+  orig: 89, 59
+  offset: 0, 0
+  index: -1
+shui2
+  rotate: true
+  xy: 343, 1
+  size: 61, 45
+  orig: 61, 45
+  offset: 0, 0
+  index: -1
+shui3
+  rotate: false
+  xy: 613, 185
+  size: 85, 86
+  orig: 85, 86
+  offset: 0, 0
+  index: -1
+shui4
+  rotate: true
+  xy: 1, 1
+  size: 112, 70
+  orig: 112, 70
+  offset: 0, 0
+  index: -1
+shui5
+  rotate: true
+  xy: 73, 7
+  size: 106, 74
+  orig: 106, 74
+  offset: 0, 0
+  index: -1
+shui6
+  rotate: false
+  xy: 308, 166
+  size: 99, 105
+  orig: 99, 105
+  offset: 0, 0
+  index: -1
+shui7
+  rotate: false
+  xy: 565, 8
+  size: 89, 59
+  orig: 89, 59
+  offset: 0, 0
+  index: -1
+yingzi
+  rotate: false
+  xy: 133, 127
+  size: 89, 21
+  orig: 89, 21
+  offset: 0, 0
+  index: -1
+yun1
+  rotate: true
+  xy: 603, 79
+  size: 90, 44
+  orig: 90, 44
+  offset: 0, 0
+  index: -1
+yun2
+  rotate: true
+  xy: 547, 69
+  size: 100, 54
+  orig: 100, 54
+  offset: 0, 0
+  index: -1
+yun3
+  rotate: true
+  xy: 133, 150
+  size: 121, 76
+  orig: 121, 76
+  offset: 0, 0
+  index: -1

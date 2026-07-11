@@ -1,0 +1,167 @@
+Shader3D Start
+{
+    type:Shader3D,
+    name:sweepLight,
+    enableInstancing:true,
+    supportReflectionProbe:true,
+    shaderType:D2_TextureSV,
+    uniformMap:{
+        u_SweepColor: { type: Color, default: [1.0, 1.0, 1.0, 1.0] },
+        u_Time: { type: Float, default: 0.0 },
+        u_SweepSpeed: { type: Float, default: 1.333333 },
+        u_SweepWidth: { type: Float, default: 0.24 },
+        u_SweepIntensity: { type: Float, default: 1.0 },
+        u_SweepAngle: { type: Float, default: 0.0 },
+        u_SweepInterval: { type: Float, default: 0.0 },
+        u_ShadowThreshold: { type: Float, default: 0.3 }
+    },
+    attributeMap: {
+        a_posuv: Vector4,
+        a_attribColor: Vector4,
+        a_attribFlags: Vector4,
+        a_customs: Vector4,
+    },
+    defines: {
+        TEXTUREVS: { type: bool, default: true }
+    }
+    shaderPass:[
+        {
+            pipeline:Forward,
+            VS:sweepVS,
+            FS:sweepPS
+        }
+    ]
+}
+Shader3D End
+
+GLSL Start
+#defineGLSL sweepVS
+
+    #define SHADER_NAME sweepLight
+    #include "Sprite2DVertex.glsl";
+
+    void main() {
+        vertexInfo info;
+        getVertexInfo(info);
+
+        v_cliped = info.cliped;
+        v_texcoordAlpha = info.texcoordAlpha;
+        v_useTex = info.useTex;
+        v_color = info.color;
+        v_useClip = info.useClip;
+        v_customs = info.customs;
+
+        gl_Position = getPosition(info.pos);
+    }
+
+#endGLSL
+
+#defineGLSL sweepPS
+    #define SHADER_NAME sweepLight
+    #if defined(GL_FRAGMENT_PRECISION_HIGH)
+        precision highp float;
+    #else
+        precision mediump float;
+    #endif
+
+    #include "Sprite2DFrag.glsl";
+
+    void main()
+    {
+        clip();
+        
+        // 获取原始纹理颜色
+        vec4 color = getSpriteTextureColor();
+        
+        // 如果原始像素透明度很低，直接返回
+        if (color.a < 0.01) {
+            setglColor(color);
+            return;
+        }
+        
+        // 获取UV坐标（用于边缘检测）
+        vec2 uv = v_texcoordAlpha.xy;
+        
+        // 计算到边缘的距离（四个方向的最小距离）
+        float distToEdge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+        
+        // 定义边缘区域宽度（可以根据需要调整，0.1表示10%的边缘区域）
+        float edgeWidth = 0.1;
+        
+        // 检测是否在边缘区域
+        bool isEdge = distToEdge < edgeWidth;
+        
+        // 检测黑色阴影：检查RGB的最大值是否低于阈值
+        float maxChannel = max(max(color.r, color.g), color.b);
+        bool isBlackShadow = maxChannel < u_ShadowThreshold;
+        
+        // 只对边缘的黑色阴影不显示扫光
+        if (isEdge && isBlackShadow) {
+            setglColor(color);
+            return;
+        }
+        
+        // 获取UV坐标（中心化到[-0.5, 0.5]范围，用于扫光计算）
+        vec2 uvCentered = v_texcoordAlpha.xy - 0.5;
+        
+        // 将角度转换为弧度
+        float angle = u_SweepAngle * 3.14159265 / 180.0;
+        
+        // 计算倾斜扫光带的法线向量（垂直于扫光带方向）
+        vec2 normal = vec2(cos(angle), sin(angle));
+        
+        // 计算扫光周期：一次扫光时间 + 间隔时间
+        // 扫光时间 = 1.0 / u_SweepSpeed（扫光一次需要的时间）
+        float sweepDuration = 1.0 / u_SweepSpeed;
+        float cycleDuration = sweepDuration + u_SweepInterval;
+        
+        // 计算当前时间在周期中的位置（0-1）
+        float cycleProgress = fract(u_Time / cycleDuration);
+        
+        // 判断是否在间隔期间
+        // 如果周期进度对应的实际时间超过了扫光时间，说明在间隔期间
+        float currentTimeInCycle = cycleProgress * cycleDuration;
+        if (currentTimeInCycle > sweepDuration) {
+            // 在间隔期间，不显示扫光
+            setglColor(color);
+            return;
+        }
+        
+        // 计算扫光带的位置（在扫光期间，进度从0到1）
+        // 将当前时间映射到扫光进度
+        float sweepProgress = currentTimeInCycle / sweepDuration;
+        
+        // 将进度映射到更大的范围，确保倾斜扫光带能完整扫过整个图片
+        // 对角线长度约为√2，所以需要更大的范围
+        float sweepOffset = (sweepProgress - 0.5) * 2.5;
+        
+        // 计算当前像素到扫光带中心线的距离
+        // 使用点积计算点到直线的距离
+        float distToSweepLine = dot(uvCentered, normal) - sweepOffset;
+        
+        // 计算扫光强度（硬边缘，无渐变）
+        float dist = abs(distToSweepLine);
+        float sweepStrength = 0.0;
+        
+        // 检查是否在扫光带宽度范围内（硬边缘判断）
+        if (dist < u_SweepWidth * 0.5) {
+            // 在扫光带内，使用固定强度（无渐变）
+            sweepStrength = 1.0;
+        }
+        
+        // 应用扫光强度参数
+        sweepStrength *= u_SweepIntensity;
+        
+        // 将扫光颜色叠加到原始颜色（使用alpha通道控制透明度）
+        vec3 sweepColor = u_SweepColor.rgb * sweepStrength * u_SweepColor.a;
+        color.rgb = color.rgb + sweepColor;
+        
+        // 可选：也可以使用混合模式（更柔和的效果）
+        // color.rgb = mix(color.rgb, color.rgb + sweepColor, sweepStrength);
+        
+        // 保持原始透明度
+        setglColor(color);
+    }
+    
+#endGLSL
+GLSL End
