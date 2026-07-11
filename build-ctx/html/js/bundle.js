@@ -4241,7 +4241,10 @@
             up() {
                 return this.lp
             }
-            request(t, s, i, h = "get") {}
+            request(t, s, i, h = "get") {
+                const e = window.__LayaWebPlatformPatch;
+                e && "function" == typeof e.handleGameRequest ? e.handleGameRequest(t, s, i, h) : (null == i ? void 0 : i.fail) && i.fail("web platform patch unavailable")
+            }
             pp(t, s, i) {
                 t ? this.request("sys/user/login", s, {
                     success: t => {
