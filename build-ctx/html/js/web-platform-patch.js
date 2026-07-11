@@ -340,6 +340,21 @@
         typeof config.leaderboardLimit === "number" && config.leaderboardLimit >= 1
           ? clampInteger(config.leaderboardLimit, 1, 100, 50)
           : 50,
+      registerAccountRpc: isNonEmptyString(config.registerAccountRpc)
+        ? config.registerAccountRpc
+        : "register_game_account",
+      loginAccountRpc: isNonEmptyString(config.loginAccountRpc)
+        ? config.loginAccountRpc
+        : "login_game_account",
+      logoutAccountRpc: isNonEmptyString(config.logoutAccountRpc)
+        ? config.logoutAccountRpc
+        : "logout_game_account",
+      sessionHeaderName: isNonEmptyString(config.sessionHeaderName)
+        ? config.sessionHeaderName
+        : "x-game-session",
+      sessionStorageKey: isNonEmptyString(config.sessionStorageKey)
+        ? config.sessionStorageKey
+        : "laya_game_account_session_v1",
       supabaseJsUrl: isNonEmptyString(config.supabaseJsUrl) ? config.supabaseJsUrl : "",
       migratedKeys:
         Array.isArray(config.migratedKeys) && config.migratedKeys.length > 0
@@ -365,12 +380,16 @@
       var source = options && typeof options === "object" ? options : {};
       var headers = {
         apikey: config.anonKey,
-        Authorization: "Bearer " + (isNonEmptyString(source.accessToken) ? source.accessToken : config.anonKey),
+        Authorization: "Bearer " + config.anonKey,
         Accept: "application/json",
       };
 
       if (source.includeJsonContentType !== false) {
         headers["Content-Type"] = "application/json";
+      }
+
+      if (isNonEmptyString(source.sessionToken)) {
+        headers[config.sessionHeaderName] = source.sessionToken;
       }
 
       if (isNonEmptyString(source.saveToken)) {
@@ -723,8 +742,9 @@
     function flushNow(options) {
       var serialized = serializeStorageMap(state.storageMap);
       var payloadMap;
+      var forceWrite = options && options.force === true;
 
-      if (serialized === state.lastSyncedSerialized) {
+      if (!forceWrite && serialized === state.lastSyncedSerialized) {
         return Promise.resolve(false);
       }
 
@@ -760,6 +780,9 @@
         .catch(function (error) {
           state.lastFlushSucceeded = false;
           warn(error);
+          if (options && options.throwOnError === true) {
+            throw error;
+          }
           return false;
         })
         .finally(function () {
@@ -979,15 +1002,14 @@
   }
 
   function createAccountController(config, http, cloudSaveController) {
+    var sessionStorage = getRawLocalStorage();
     var state = {
-      supabaseClient: null,
       session: null,
       accountRow: null,
       syncTimer: 0,
       panel: null,
-      authSubscription: null,
       initialized: false,
-      available: false,
+      available: true,
     };
 
     function log() {
@@ -996,6 +1018,126 @@
 
     function warn() {
       console.warn.apply(console, ["[Account]"].concat(Array.prototype.slice.call(arguments)));
+    }
+
+    function normalizeSessionPayload(payload) {
+      var source = payload && typeof payload === "object" ? payload : {};
+      var user = source.user && typeof source.user === "object" ? source.user : {};
+      var userId = isNonEmptyString(source.user_id)
+        ? source.user_id.trim()
+        : isNonEmptyString(source.userId)
+          ? source.userId.trim()
+          : isNonEmptyString(user.id)
+            ? user.id.trim()
+            : "";
+      var accountName = isNonEmptyString(source.account_name)
+        ? source.account_name.trim()
+        : isNonEmptyString(source.accountName)
+          ? source.accountName.trim()
+          : isNonEmptyString(user.account)
+            ? user.account.trim()
+            : "";
+      var accessToken = isNonEmptyString(source.session_token)
+        ? source.session_token
+        : isNonEmptyString(source.access_token)
+          ? source.access_token
+          : isNonEmptyString(source.accessToken)
+            ? source.accessToken
+            : "";
+
+      if (!isUuidLike(userId) || !isNonEmptyString(accessToken)) {
+        return null;
+      }
+
+      return {
+        userId: userId,
+        accountName: accountName,
+        accessToken: accessToken,
+      };
+    }
+
+    function buildSession(userId, accountName, accessToken) {
+      return {
+        access_token: accessToken,
+        token_type: "game-account",
+        user: {
+          id: userId,
+          email: "",
+          account: accountName || "",
+        },
+      };
+    }
+
+    function persistSession() {
+      if (!sessionStorage) {
+        return;
+      }
+
+      try {
+        if (!isSignedIn()) {
+          sessionStorage.removeItem(config.sessionStorageKey);
+          return;
+        }
+
+        sessionStorage.setItem(
+          config.sessionStorageKey,
+          JSON.stringify({
+            userId: state.session.user.id,
+            accountName: state.session.user.account || "",
+            accessToken: state.session.access_token,
+          })
+        );
+      } catch (error) {
+        warn("保存本地账号会话失败", error);
+      }
+    }
+
+    function clearSession() {
+      state.session = null;
+      state.accountRow = null;
+      persistSession();
+    }
+
+    function saveSession(payload) {
+      var normalized = normalizeSessionPayload(payload);
+      if (!normalized) {
+        throw new Error("账号会话无效，请重新登录");
+      }
+
+      state.session = buildSession(
+        normalized.userId,
+        normalized.accountName,
+        normalized.accessToken
+      );
+      persistSession();
+      return state.session;
+    }
+
+    function restorePersistedSession() {
+      if (!sessionStorage) {
+        return false;
+      }
+
+      try {
+        var raw = sessionStorage.getItem(config.sessionStorageKey);
+        var payload = raw ? readJson(raw, null) : null;
+        var normalized = normalizeSessionPayload(payload);
+
+        if (!normalized) {
+          sessionStorage.removeItem(config.sessionStorageKey);
+          return false;
+        }
+
+        state.session = buildSession(
+          normalized.userId,
+          normalized.accountName,
+          normalized.accessToken
+        );
+        return true;
+      } catch (error) {
+        warn("恢复本地账号会话失败", error);
+        return false;
+      }
     }
 
     function isSignedIn() {
@@ -1070,7 +1212,7 @@
         .requestJson(http.buildRestUrl(config.accountTable, query), {
           method: "GET",
           headers: http.buildHeaders({
-            accessToken: getAccessToken(),
+            sessionToken: getAccessToken(),
           }),
         })
         .then(function (rows) {
@@ -1084,7 +1226,7 @@
         .requestJson(http.buildRestUrl(config.accountTable, "on_conflict=user_id"), {
           method: "POST",
           headers: http.buildHeaders({
-            accessToken: getAccessToken(),
+            sessionToken: getAccessToken(),
             extraHeaders: {
               Prefer: "resolution=merge-duplicates,return=representation",
             },
@@ -1168,21 +1310,27 @@
       var identity = cloudSaveController.getSaveIdentity();
       var profile = mergeProfileOverrides();
 
-      return http
-        .requestJson(http.buildRpcUrl(config.bindSaveRpc), {
-          method: "POST",
-          headers: http.buildHeaders({
-            accessToken: getAccessToken(),
-            saveToken: identity.saveToken,
-          }),
-          body: {
-            p_save_id: identity.saveId,
-            p_save_token: identity.saveToken,
-            p_display_name: profile.nick,
-            p_avatar_url: profile.avatarUrl,
-            p_province: profile.province,
-            p_best_star: Math.max(0, profile.bestStar),
-          },
+      return cloudSaveController
+        .flushNow({
+          force: true,
+          throwOnError: true,
+        })
+        .then(function () {
+          return http.requestJson(http.buildRpcUrl(config.bindSaveRpc), {
+            method: "POST",
+            headers: http.buildHeaders({
+              sessionToken: getAccessToken(),
+              saveToken: identity.saveToken,
+            }),
+            body: {
+              p_save_id: identity.saveId,
+              p_save_token: identity.saveToken,
+              p_display_name: profile.nick,
+              p_avatar_url: profile.avatarUrl,
+              p_province: profile.province,
+              p_best_star: Math.max(0, profile.bestStar),
+            },
+          });
         })
         .then(function (payload) {
           return selectAccountRow().then(function () {
@@ -1197,7 +1345,7 @@
         .requestJson(http.buildRpcUrl(config.leaderboardRpc), {
           method: "POST",
           headers: http.buildHeaders({
-            accessToken: getAccessToken(),
+            sessionToken: getAccessToken(),
           }),
           body: {
             p_scope: scope,
@@ -1268,7 +1416,7 @@
       }
 
       return [
-        "已登录：" + (state.session.user.email || shortValue(state.session.user.id)),
+        "已登录：" + (state.session.user.account || shortValue(state.session.user.id)),
         state.accountRow && state.accountRow.save_id
           ? "已绑定存档：" + shortValue(state.accountRow.save_id)
           : "尚未绑定当前存档",
@@ -1294,9 +1442,6 @@
       var i;
 
       for (i = 0; i < allButtons.length; i += 1) {
-        if (allButtons[i].dataset.action === "close") {
-          continue;
-        }
         allButtons[i].disabled = !!isBusy;
       }
     }
@@ -1306,16 +1451,19 @@
         return;
       }
 
+      var signedIn = isSignedIn();
       state.panel.status.textContent = buildPanelStatusText();
+      state.panel.authSection.hidden = signedIn;
 
-      if (isSignedIn()) {
-        state.panel.email.value = state.session.user.email || state.panel.email.value;
+      if (signedIn) {
+        state.panel.account.value = state.session.user.account || state.panel.account.value;
+        state.panel.password.value = "";
       }
 
-      state.panel.bindButton.disabled = !isSignedIn();
+      state.panel.bindButton.disabled = !signedIn;
       state.panel.restoreButton.disabled =
-        !isSignedIn() || !(state.accountRow && state.accountRow.save_id && state.accountRow.save_token);
-      state.panel.signOutButton.disabled = !isSignedIn();
+        !signedIn || !(state.accountRow && state.accountRow.save_id && state.accountRow.save_token);
+      state.panel.signOutButton.disabled = !signedIn;
     }
 
     function closePanel() {
@@ -1324,6 +1472,7 @@
       }
 
       state.panel.backdrop.hidden = true;
+      state.panel.password.value = "";
       setPanelMessage("", false);
     }
 
@@ -1337,15 +1486,15 @@
     }
 
     function requireCredentials() {
-      var email = state.panel ? state.panel.email.value.trim() : "";
+      var account = state.panel ? state.panel.account.value.trim() : "";
       var password = state.panel ? state.panel.password.value : "";
 
-      if (!email || !password) {
-        throw new Error("请输入邮箱和密码");
+      if (!account || !password) {
+        throw new Error("请输入账号和密码");
       }
 
       return {
-        email: email,
+        account: account,
         password: password,
       };
     }
@@ -1357,10 +1506,24 @@
 
         Promise.resolve()
           .then(action)
-          .then(function (message) {
+          .then(function (result) {
+            var outcome =
+              result && typeof result === "object" && !Array.isArray(result)
+                ? result
+                : {
+                    message: result,
+                    close: false,
+                  };
+
             updatePanelState();
-            if (isNonEmptyString(message)) {
-              setPanelMessage(message, false);
+
+            if (outcome.close === true) {
+              closePanel();
+              return;
+            }
+
+            if (isNonEmptyString(outcome.message)) {
+              setPanelMessage(outcome.message, false);
             }
           })
           .catch(function (error) {
@@ -1380,20 +1543,20 @@
 
       var style = document.createElement("style");
       style.textContent = [
-        "#laya-account-fab{position:fixed;top:12px;right:12px;z-index:2147483600;border:0;border-radius:999px;background:#111827;color:#fff;padding:10px 14px;font:600 14px/1 sans-serif;box-shadow:0 12px 30px rgba(17,24,39,.28);}",
+        "#laya-account-fab{position:fixed;top:12px;right:12px;z-index:2147483602;border:0;border-radius:999px;background:#111827;color:#fff;padding:10px 14px;font:600 14px/1 sans-serif;box-shadow:0 12px 30px rgba(17,24,39,.28);}",
         "#laya-account-backdrop{position:fixed;inset:0;z-index:2147483601;background:rgba(15,23,42,.42);display:flex;align-items:flex-start;justify-content:flex-end;padding:64px 12px 12px;box-sizing:border-box;}",
+        "#laya-account-backdrop[hidden]{display:none !important;}",
         "#laya-account-dialog{width:min(360px,100%);background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(15,23,42,.3);padding:18px;box-sizing:border-box;font:14px/1.5 sans-serif;color:#0f172a;}",
         "#laya-account-dialog h2{margin:0;font:700 18px/1.2 sans-serif;}",
         "#laya-account-dialog pre{margin:10px 0 0;padding:12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;white-space:pre-wrap;font:12px/1.5 ui-monospace,Consolas,monospace;color:#334155;}",
         "#laya-account-dialog label{display:block;margin-top:12px;font:600 13px/1.4 sans-serif;color:#334155;}",
         "#laya-account-dialog input{width:100%;margin-top:6px;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;box-sizing:border-box;font:14px/1.2 sans-serif;}",
         "#laya-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}",
-        "#laya-account-actions button,#laya-account-secondary button,#laya-account-close{border:0;border-radius:12px;padding:10px 12px;font:600 13px/1.2 sans-serif;cursor:pointer;}",
+        "#laya-account-actions button,#laya-account-secondary button{border:0;border-radius:12px;padding:10px 12px;font:600 13px/1.2 sans-serif;cursor:pointer;}",
         "#laya-account-actions button{background:#111827;color:#fff;}",
         "#laya-account-secondary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}",
         "#laya-account-secondary button{background:#e2e8f0;color:#0f172a;}",
-        "#laya-account-close{background:#f1f5f9;color:#0f172a;}",
-        "#laya-account-header{display:flex;align-items:center;justify-content:space-between;gap:10px;}",
+        "#laya-account-header{display:flex;align-items:center;justify-content:flex-start;gap:10px;}",
         "#laya-account-hint{margin-top:12px;color:#475569;font-size:12px;}",
         "#laya-account-message{margin-top:12px;min-height:20px;font-size:12px;color:#0f766e;}",
         "#laya-account-message[data-error='1']{color:#b91c1c;}",
@@ -1412,15 +1575,16 @@
       backdrop.innerHTML = [
         '<div id="laya-account-dialog" role="dialog" aria-modal="true" aria-label="账号同步面板">',
         '  <div id="laya-account-header">',
-        "    <h2>Supabase 账号</h2>",
-        '    <button id="laya-account-close" type="button" data-action="close">关闭</button>',
+        "    <h2>账号同步</h2>",
         "  </div>",
         '  <pre id="laya-account-status"></pre>',
-        '  <label>邮箱<input id="laya-account-email" type="email" autocomplete="email" placeholder="name@example.com" /></label>',
-        '  <label>密码<input id="laya-account-password" type="password" autocomplete="current-password" placeholder="至少 6 位" /></label>',
-        '  <div id="laya-account-actions">',
-        '    <button type="button" data-action="signup">注册并登录</button>',
-        '    <button type="button" data-action="signin">登录</button>',
+        '  <div id="laya-account-auth">',
+        '    <label>账号<input id="laya-account-name" type="text" autocomplete="username" placeholder="请输入自定义账号" /></label>',
+        '    <label>密码<input id="laya-account-password" type="password" autocomplete="current-password" placeholder="请输入密码" /></label>',
+        '    <div id="laya-account-actions">',
+        '      <button type="button" data-action="signup">注册并登录</button>',
+        '      <button type="button" data-action="signin">登录</button>',
+        "    </div>",
         "  </div>",
         '  <div id="laya-account-secondary">',
         '    <button type="button" data-action="bind">绑定当前存档</button>',
@@ -1428,7 +1592,7 @@
         '    <button type="button" data-action="copy-link">复制存档链接</button>',
         '    <button type="button" data-action="signout">登出</button>',
         "  </div>",
-        '  <div id="laya-account-hint">登录后可把当前数据库存档绑定到账号；在其他设备登录后可直接恢复绑定存档。</div>',
+        '  <div id="laya-account-hint">注册后可直接用账号密码跨设备登录，并恢复已绑定的云存档。</div>',
         '  <div id="laya-account-message" data-error="0"></div>',
         "</div>",
       ].join("");
@@ -1439,8 +1603,11 @@
       state.panel = {
         root: backdrop,
         backdrop: backdrop,
+        fab: fab,
+        dialog: backdrop.querySelector("#laya-account-dialog"),
         status: backdrop.querySelector("#laya-account-status"),
-        email: backdrop.querySelector("#laya-account-email"),
+        authSection: backdrop.querySelector("#laya-account-auth"),
+        account: backdrop.querySelector("#laya-account-name"),
         password: backdrop.querySelector("#laya-account-password"),
         message: backdrop.querySelector("#laya-account-message"),
         bindButton: backdrop.querySelector('[data-action="bind"]'),
@@ -1448,39 +1615,103 @@
         signOutButton: backdrop.querySelector('[data-action="signout"]'),
       };
 
-      fab.addEventListener("click", openPanel);
-      backdrop.addEventListener("click", function (event) {
-        if (event.target === backdrop) {
-          closePanel();
+      function closeFromOutsideEvent(event) {
+        if (!state.panel || !state.panel.dialog) {
+          return;
         }
+
+        if (state.panel.backdrop.hidden) {
+          return;
+        }
+
+        var target = event.target;
+        if (target && state.panel.dialog.contains(target)) {
+          return;
+        }
+
+        if (target && state.panel.fab && state.panel.fab.contains(target)) {
+          return;
+        }
+
+        if (event.type === "mousedown" && event.button !== undefined && event.button !== 0) {
+          return;
+        }
+
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        if (typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+        closePanel();
+      }
+
+      fab.addEventListener("click", function (event) {
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        if (typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+
+        if (state.panel && !state.panel.backdrop.hidden) {
+          closePanel();
+          return;
+        }
+
+        openPanel();
       });
-      backdrop.querySelector('[data-action="close"]').addEventListener("click", closePanel);
+      backdrop.addEventListener("pointerdown", closeFromOutsideEvent);
+      document.addEventListener("mousedown", closeFromOutsideEvent, true);
+      document.addEventListener("touchstart", closeFromOutsideEvent, true);
+      document.addEventListener(
+        "keydown",
+        function (event) {
+          if (!state.panel || state.panel.backdrop.hidden) {
+            return;
+          }
+
+          if (event.key !== "Escape") {
+            return;
+          }
+
+          if (typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          if (typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          closePanel();
+        },
+        true
+      );
       backdrop
         .querySelector('[data-action="signup"]')
         .addEventListener(
           "click",
           withPanelAction(function () {
+            if (isSignedIn()) {
+              return {
+                message: "当前已登录，如需切换账号请先登出。",
+              };
+            }
+
             var credentials = requireCredentials();
 
-            return state.supabaseClient.auth
-              .signUp({
-                email: credentials.email,
-                password: credentials.password,
+            return http
+              .requestJson(http.buildRpcUrl(config.registerAccountRpc), {
+                method: "POST",
+                body: {
+                  p_account_name: credentials.account,
+                  p_password: credentials.password,
+                },
               })
-              .then(function (result) {
-                if (result.error) {
-                  throw result.error;
-                }
-
-                state.session = result.data && result.data.session ? result.data.session : null;
-
-                if (!state.session) {
-                  updatePanelState();
-                  return "注册成功，请按 Supabase 配置完成邮箱验证后再登录。";
-                }
-
+              .then(function (payload) {
+                saveSession(payload);
                 return afterSignedIn().then(function () {
-                  return "注册并登录成功。";
+                  return {
+                    close: true,
+                  };
                 });
               });
           })
@@ -1490,26 +1721,28 @@
         .addEventListener(
           "click",
           withPanelAction(function () {
+            if (isSignedIn()) {
+              return {
+                message: "当前已登录，如需切换账号请先登出。",
+              };
+            }
+
             var credentials = requireCredentials();
 
-            return state.supabaseClient.auth
-              .signInWithPassword({
-                email: credentials.email,
-                password: credentials.password,
+            return http
+              .requestJson(http.buildRpcUrl(config.loginAccountRpc), {
+                method: "POST",
+                body: {
+                  p_account_name: credentials.account,
+                  p_password: credentials.password,
+                },
               })
-              .then(function (result) {
-                if (result.error) {
-                  throw result.error;
-                }
-
-                state.session = result.data && result.data.session ? result.data.session : null;
-
-                if (!state.session) {
-                  throw new Error("登录成功但未拿到会话，请检查 Supabase 认证配置。");
-                }
-
+              .then(function (payload) {
+                saveSession(payload);
                 return afterSignedIn().then(function () {
-                  return "登录成功。";
+                  return {
+                    close: true,
+                  };
                 });
               });
           })
@@ -1520,7 +1753,9 @@
           "click",
           withPanelAction(function () {
             return bindCurrentSave().then(function () {
-              return "当前存档已绑定到账号。";
+              return {
+                close: true,
+              };
             });
           })
         );
@@ -1530,7 +1765,13 @@
           "click",
           withPanelAction(function () {
             return restoreBoundSave({ mergeCurrent: false }).then(function (restored) {
-              return restored ? "已恢复账号绑定存档。" : "当前账号还没有绑定存档。";
+              if (!restored) {
+                return "当前账号还没有绑定存档。";
+              }
+
+              return {
+                close: true,
+              };
             });
           })
         );
@@ -1549,16 +1790,29 @@
         .addEventListener(
           "click",
           withPanelAction(function () {
-            return state.supabaseClient.auth.signOut().then(function (result) {
-              if (result && result.error) {
-                throw result.error;
-              }
+            return Promise.resolve()
+              .then(function () {
+                if (!isSignedIn()) {
+                  return null;
+                }
 
-              state.session = null;
-              state.accountRow = null;
-              updatePanelState();
-              return "已退出登录。";
-            });
+                return http.requestJson(http.buildRpcUrl(config.logoutAccountRpc), {
+                  method: "POST",
+                  headers: http.buildHeaders({
+                    sessionToken: getAccessToken(),
+                  }),
+                  body: {},
+                });
+              })
+              .catch(function (error) {
+                warn("退出账号失败", error);
+                return null;
+              })
+              .then(function () {
+                clearSession();
+                updatePanelState();
+                return "已退出登录。";
+              });
           })
         );
 
@@ -1581,89 +1835,42 @@
         });
     }
 
-    function ensureSupabaseClient() {
-      if (state.supabaseClient) {
-        state.available = true;
-        return Promise.resolve(state.supabaseClient);
-      }
-
-      function createClient() {
-        if (!window.supabase || typeof window.supabase.createClient !== "function") {
-          throw new Error("Supabase JS 未正确挂载到 window.supabase");
-        }
-
-        state.available = true;
-        state.supabaseClient = window.supabase.createClient(config.supabaseUrl, config.anonKey, {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: false,
-          },
-        });
-      }
-
-      if (window.supabase && typeof window.supabase.createClient === "function") {
-        createClient();
-        return Promise.resolve(state.supabaseClient);
-      }
-
-      return loadExternalScript(config.supabaseJsUrl, config.requestTimeoutMs).then(function () {
-        createClient();
-        return state.supabaseClient;
-      });
-    }
-
     function init() {
-      if (!config.supabaseJsUrl) {
+      if (state.initialized) {
+        updatePanelState();
         return Promise.resolve();
       }
 
-      return ensureSupabaseClient().then(function () {
-        if (state.initialized) {
-          updatePanelState();
-          return Promise.resolve();
-        }
+      state.initialized = true;
+      createAccountPanel();
+      restorePersistedSession();
 
-        state.initialized = true;
-        createAccountPanel();
+      if (!isSignedIn()) {
+        openPanel();
+        log("账号系统已就绪。");
+        return Promise.resolve();
+      }
 
-        var authListenerResult = state.supabaseClient.auth.onAuthStateChange(function (event, session) {
-          state.session = session || null;
-          if (!session) {
-            state.accountRow = null;
-          }
-          updatePanelState();
-        });
-
-        if (authListenerResult) {
-          if (authListenerResult.data && authListenerResult.data.subscription) {
-            state.authSubscription = authListenerResult.data.subscription;
-          } else if (authListenerResult.subscription) {
-            state.authSubscription = authListenerResult.subscription;
-          }
-        }
-
-        return state.supabaseClient.auth
-          .getSession()
-          .then(function (result) {
-            if (result.error) {
-              throw result.error;
-            }
-
-            state.session = result.data && result.data.session ? result.data.session : null;
-
-            if (!state.session) {
-              updatePanelState();
-              return null;
-            }
-
-            return afterSignedIn();
-          })
-          .then(function () {
+      return selectAccountRow()
+        .then(function (row) {
+          if (!row) {
+            clearSession();
             updatePanelState();
-            log("账号系统已就绪。");
-          });
-      });
+            return null;
+          }
+
+          return afterSignedIn();
+        })
+        .catch(function (error) {
+          warn("恢复账号会话失败", error);
+          clearSession();
+          updatePanelState();
+          return null;
+        })
+        .then(function () {
+          updatePanelState();
+          log("账号系统已就绪。");
+        });
     }
 
     return {
@@ -1879,7 +2086,8 @@
     return {
       signedIn: !!(session && session.user),
       userId: session && session.user ? session.user.id : "",
-      email: session && session.user ? session.user.email || "" : "",
+      account: session && session.user ? session.user.account || "" : "",
+      email: "",
       saveId: identity.saveId,
       saveToken: identity.saveToken,
       profile: cloudSaveController.getPlayerProfile(),
