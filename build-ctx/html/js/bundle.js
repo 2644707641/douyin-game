@@ -8428,7 +8428,7 @@
                 y.instance.on(u.Lt, this, this.Ex), y.instance.on(u.wt, this, this.Bx), y.instance.on(u.vt, this, this.Ix), y.instance.on(u.kt, this, this.Dx), y.instance.on(u._t, this, this.Tx)
             }
             Px() {
-                F.instance().rank.ca.id >= this.Ue.Re && (F.instance().player.openProps = !0)
+                F.instance().player.openProps = F.instance().rank.ca.id >= this.Ue.Re
             }
             getPropsType(t) {
                 return Array.isArray(t) ? t[0] : t
@@ -18171,6 +18171,22 @@
                 }
             }
         },
+        LayaGameTestBridge = (window.__LayaGameTestTools = window.__LayaGameTestTools || {}, window.__LayaGameTestTools.promoteRankStar = () => {
+            const t = window.__LayaWebPlatformPatch && window.__LayaWebPlatformPatch.getStatus ? window.__LayaWebPlatformPatch.getStatus() : null;
+            if (!t || "xuwang" !== t.account) throw new Error("当前账号无权使用段位测试功能");
+            const s = F.instance().player.curStar;
+            Pn.instance().zG(1), Pn.instance().jG();
+            const i = K.instance().Tu("MainScene");
+            return i && i.parent && "function" == typeof i.RV && i.RV(), {
+                previousStar: s,
+                star: F.instance().player.curStar
+            }
+        }, window.__LayaGameTestTools.restoreRankStar = t => {
+            if ("number" != typeof t || !Number.isFinite(t) || !Number.isInteger(t) || t < 0) throw new Error("待恢复星级无效");
+            F.instance().player.curStar = t, Pn.instance().NG(), Pn.instance().jG();
+            const s = K.instance().Tu("MainScene");
+            return s && s.parent && "function" == typeof s.RV && s.RV(), F.instance().player.curStar
+        }, 0),
         An = class extends C {
             init() {
                 this.hH = F.instance().player, this.lH = F.instance().stamina, this.cH(), j.instance().oo("StaminaMgr", this, this.update)
@@ -21132,7 +21148,10 @@
                 }
                 this.flyStars.visible = !1;
                 for (let t = 0; t < this.gq.length; t++) this.gq[t] && this.gq[t].parent && this.gq[t].removeSelf();
-                if (this.gq = [], Laya.Tween.killAll(this.goldBg), this.goldBg.scale(0, 0), console.log("关闭结算场景"), K.instance().Iu("GameOverScene"), K.instance().Eu("MainScene"));
+                if (this.gq = [], Laya.Tween.killAll(this.goldBg), this.goldBg.scale(0, 0), console.log("关闭结算场景"), K.instance().Iu("GameOverScene"), K.instance().Eu("MainScene"), F.instance().player.openProps) {
+                    let t = Ni.instance().Hx();
+                    t.length > 0 && K.instance().Eu("ShopScene", !1, t)
+                }
                 F.instance().Gn.Wi.length = 0, this.vq.length = 0, Laya.Tween.killAll(this.arrow)
             }
         };
@@ -21426,7 +21445,7 @@
                 wt.instance().xy(), this.AV();
                 const s = F.instance().player,
                     i = Ji.instance().Xb();
-                this.weaponBtn.visible = i, s.openProps && (this.shopBtn.visible = !0, this.shopWalk.visible = !1), i && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), i ? this.FV() : this.XV(), this.OV()
+                this.weaponBtn.visible = i, i && (s.weaponFree || (Ji.instance().Wb(), s.weaponFree = !0)), N.instance().playMusic("bg_mainScene"), 2 != F.instance().player.sidebarState && kt.instance().Oy() || (this.dySidebarBtn.visible = !1), this.RV(), this.CV(), this.UV(), i ? this.FV() : this.XV(), this.OV()
             }
             onClosed() {
                 this.mV > 0 && ($.instance().El("btnSparkle", this.mV), this.mV = 0), this.YV(), this.XV(), Laya.Tween.killAll(this.dySidebarBtnLight)

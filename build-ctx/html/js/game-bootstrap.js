@@ -35,10 +35,10 @@
 
   waitForPatchReady()
     .then(function () {
-      return loadScript("js/bundle.js");
+      return loadScript("js/bundle.js?v=merchant-rank-20260713");
     })
     .then(function () {
-      return loadScript("js/index.js");
+      return loadScript("js/index.js?v=merchant-rank-20260713");
     })
     .catch(report);
 })();

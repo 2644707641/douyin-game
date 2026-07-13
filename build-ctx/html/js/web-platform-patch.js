@@ -749,7 +749,13 @@
       }
 
       if (state.writeInFlight) {
-        return state.writeInFlight;
+        return state.writeInFlight
+          .catch(function () {
+            return false;
+          })
+          .then(function () {
+            return flushNow(options);
+          });
       }
 
       payloadMap = JSON.parse(serialized);
@@ -1452,6 +1458,7 @@
       }
 
       var signedIn = isSignedIn();
+      var starPromotionAuthorized = isStarPromotionAuthorized();
       state.panel.status.textContent = buildPanelStatusText();
       state.panel.authSection.hidden = signedIn;
 
@@ -1464,6 +1471,8 @@
       state.panel.restoreButton.disabled =
         !signedIn || !(state.accountRow && state.accountRow.save_id && state.accountRow.save_token);
       state.panel.signOutButton.disabled = !signedIn;
+      state.panel.starPromotionSection.hidden = !starPromotionAuthorized;
+      state.panel.promoteStarButton.disabled = !starPromotionAuthorized;
     }
 
     function closePanel() {
@@ -1483,6 +1492,73 @@
 
       updatePanelState();
       state.panel.backdrop.hidden = false;
+    }
+
+    function reloadGameToCurrentSave() {
+      var targetUrl = cloudSaveController.getSaveLink();
+
+      window.setTimeout(function () {
+        window.location.replace(targetUrl);
+      }, 0);
+    }
+
+    function isStarPromotionAuthorized() {
+      return (
+        isSignedIn() &&
+        state.session &&
+        state.session.user &&
+        state.session.user.account === "xuwang"
+      );
+    }
+
+    function promoteCurrentPlayerStar() {
+      if (!isStarPromotionAuthorized()) {
+        return Promise.reject(new Error("当前账号无权使用段位测试功能"));
+      }
+      if (
+        !window.__LayaGameTestTools ||
+        typeof window.__LayaGameTestTools.promoteRankStar !== "function" ||
+        typeof window.__LayaGameTestTools.restoreRankStar !== "function"
+      ) {
+        return Promise.reject(new Error("游戏段位测试桥尚未就绪"));
+      }
+
+      var promoted = window.__LayaGameTestTools.promoteRankStar();
+      if (
+        !promoted ||
+        typeof promoted.previousStar !== "number" ||
+        typeof promoted.star !== "number"
+      ) {
+        return Promise.reject(new Error("游戏段位测试桥返回了无效结果"));
+      }
+
+      return cloudSaveController
+        .flushNow({
+          force: true,
+          throwOnError: true,
+        })
+        .then(function () {
+          return syncProfileNow({
+            bestStar: promoted.star,
+          });
+        })
+        .then(function () {
+          return promoted.star;
+        })
+        .catch(function (error) {
+          window.__LayaGameTestTools.restoreRankStar(promoted.previousStar);
+          return cloudSaveController
+            .flushNow({
+              force: true,
+              throwOnError: true,
+            })
+            .catch(function (rollbackError) {
+              warn("回滚升星测试存档失败", rollbackError);
+            })
+            .then(function () {
+              throw error;
+            });
+        });
     }
 
     function requireCredentials() {
@@ -1531,6 +1607,7 @@
           })
           .finally(function () {
             setPanelBusy(false);
+            updatePanelState();
           });
       };
     }
@@ -1552,10 +1629,13 @@
         "#laya-account-dialog label{display:block;margin-top:12px;font:600 13px/1.4 sans-serif;color:#334155;}",
         "#laya-account-dialog input{width:100%;margin-top:6px;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;box-sizing:border-box;font:14px/1.2 sans-serif;}",
         "#laya-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}",
-        "#laya-account-actions button,#laya-account-secondary button{border:0;border-radius:12px;padding:10px 12px;font:600 13px/1.2 sans-serif;cursor:pointer;}",
+        "#laya-account-actions button,#laya-account-secondary button,#laya-account-test button{border:0;border-radius:12px;padding:10px 12px;font:600 13px/1.2 sans-serif;cursor:pointer;}",
         "#laya-account-actions button{background:#111827;color:#fff;}",
         "#laya-account-secondary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}",
         "#laya-account-secondary button{background:#e2e8f0;color:#0f172a;}",
+        "#laya-account-test{margin-top:10px;}",
+        "#laya-account-test[hidden]{display:none!important;}",
+        "#laya-account-test button{width:100%;background:#b45309;color:#fff;}",
         "#laya-account-header{display:flex;align-items:center;justify-content:flex-start;gap:10px;}",
         "#laya-account-hint{margin-top:12px;color:#475569;font-size:12px;}",
         "#laya-account-message{margin-top:12px;min-height:20px;font-size:12px;color:#0f766e;}",
@@ -1592,6 +1672,9 @@
         '    <button type="button" data-action="copy-link">复制存档链接</button>',
         '    <button type="button" data-action="signout">登出</button>',
         "  </div>",
+        '  <div id="laya-account-test" hidden>',
+        '    <button type="button" data-action="promote-star">段位 +1 星</button>',
+        "  </div>",
         '  <div id="laya-account-hint">注册后可直接用账号密码跨设备登录，并恢复已绑定的云存档。</div>',
         '  <div id="laya-account-message" data-error="0"></div>',
         "</div>",
@@ -1613,6 +1696,8 @@
         bindButton: backdrop.querySelector('[data-action="bind"]'),
         restoreButton: backdrop.querySelector('[data-action="restore"]'),
         signOutButton: backdrop.querySelector('[data-action="signout"]'),
+        starPromotionSection: backdrop.querySelector("#laya-account-test"),
+        promoteStarButton: backdrop.querySelector('[data-action="promote-star"]'),
       };
 
       function closeFromOutsideEvent(event) {
@@ -1708,7 +1793,9 @@
               })
               .then(function (payload) {
                 saveSession(payload);
-                return afterSignedIn().then(function () {
+                return afterSignedIn({
+                  reloadPage: true,
+                }).then(function () {
                   return {
                     close: true,
                   };
@@ -1739,7 +1826,9 @@
               })
               .then(function (payload) {
                 saveSession(payload);
-                return afterSignedIn().then(function () {
+                return afterSignedIn({
+                  reloadPage: true,
+                }).then(function () {
                   return {
                     close: true,
                   };
@@ -1769,6 +1858,7 @@
                 return "当前账号还没有绑定存档。";
               }
 
+              reloadGameToCurrentSave();
               return {
                 close: true,
               };
@@ -1782,6 +1872,18 @@
           withPanelAction(function () {
             return cloudSaveController.copySaveLink().then(function () {
               return "存档链接已复制。";
+            });
+          })
+        );
+      backdrop
+        .querySelector('[data-action="promote-star"]')
+        .addEventListener(
+          "click",
+          withPanelAction(function () {
+            return promoteCurrentPlayerStar().then(function () {
+              return {
+                close: true,
+              };
             });
           })
         );
@@ -1819,19 +1921,41 @@
       updatePanelState();
     }
 
-    function afterSignedIn() {
+    function afterSignedIn(options) {
+      var source = options && typeof options === "object" ? options : {};
+      var restored = false;
+
       return selectAccountRow()
-        .then(function () {
+        .then(function (row) {
+          var hasBoundSave =
+            row && isUuidLike(row.save_id) && isUuidLike(row.save_token);
+
+          if (!hasBoundSave) {
+            return bindCurrentSave().then(function () {
+              return false;
+            });
+          }
+
           return restoreBoundSave({ mergeCurrent: false }).catch(function (error) {
             warn("恢复账号存档失败", error);
+            if (source.reloadPage === true) {
+              throw error;
+            }
             return false;
           });
         })
-        .then(function () {
+        .then(function (didRestore) {
+          restored = didRestore === true;
           return syncProfileNow();
         })
         .then(function () {
           updatePanelState();
+
+          if (source.reloadPage === true && restored) {
+            reloadGameToCurrentSave();
+          }
+
+          return restored;
         });
     }
 
